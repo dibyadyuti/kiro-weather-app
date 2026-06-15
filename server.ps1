@@ -1,4 +1,4 @@
-# server.ps1 — Serves weather.html on http://localhost:8080/
+# server.ps1 - Serves weather.html on http://localhost:8080/
 # Uses only built-in PowerShell/.NET (System.Net.HttpListener). No third-party dependencies.
 
 $url = 'http://localhost:8080/'
@@ -9,7 +9,7 @@ $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add($url)
 $listener.Start()
 
-Write-Host "Weather app running at http://localhost:8080 — press Ctrl+C to stop."
+Write-Host "Weather app running at http://localhost:8080 - press Ctrl+C to stop."
 
 try {
     while ($listener.IsListening) {

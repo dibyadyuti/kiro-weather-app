@@ -31,7 +31,7 @@ Build a single-page weather forecast app (`weather.html`) served by a zero-depen
   - City name from `#city-input` is passed directly to Nominatim — never hardcoded or stored
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 3. Verify the app works end-to-end
+- [x] 3. Verify the app works end-to-end
   - Start the server: run `.\server.ps1` (or `start.bat` if execution policy blocks it)
   - Open `http://localhost:8080` in a browser
   - Test at least one real city lookup (e.g., "Austin, TX") and confirm the 5-day table populates
