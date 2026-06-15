@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather App Tests</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 2rem; background: #f5f5f5; }
+    h1 { margin-bottom: 1rem; color: #1a3a5c; }
+    .suite { background: #fff; border-radius: 8px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .suite h2 { font-size: 1rem; margin-bottom: 0.75rem; color: #333; }
+    .result { font-size: 0.9rem; padding: 0.3rem 0; border-bottom: 1px solid #eee; }
+    .result:last-child { border-bottom: none; }
+    .pass { color: #1a7a1a; }
+    .fail { color: #b00020; font-weight: 600; }
+    #summary { font-size: 1.1rem; font-weight: 700; margin-top: 1rem; }
+    .pass-summary { color: #1a7a1a; }
+    .fail-summary { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Weather App Tests</h1>
+  <div id="results"></div>
+  <div id="summary"></div>
+
+  <!-- fast-check loaded from CDN — no install required -->
+  <script src="https://cdn.jsdelivr.net/npm/fast-check/lib/bundle/fast-check.js"></script>
+
+  <script>
+    // ── Functions under test (inlined from weather.html) ───────────────────
+
+    // Property 8: getWeatherIcon — maps shortForecast description to emoji icon
+    function getWeatherIcon(shortForecast) {
+      const s = (shortForecast || '').toLowerCase();
+      if (/snow|blizzard|flurr/.test(s))                          return '❄️';
+      if (/rain|shower|drizzle|storm/.test(s))                    return '🌧️';
+      if (/partly cloudy|mostly cloudy|partly sunny/.test(s))     return '⛅';
+      if (/cloudy|overcast|fog|haz/.test(s))                      return '☁️';
+      if (/sunny|clear/.test(s))                                   return '☀️';
+      return '🌡️';
+    }
+
+    // Property 6: filterDaytimePeriods — filters isDaytime, slices first 5
+    function filterDaytimePeriods(periods) {
+      return periods.filter(p => p.isDaytime === true).slice(0, 5);
+    }
+
+    // ── Minimal test harness ────────────────────────────────────────────────
+
+    let passed = 0;
+    let failed = 0;
+    const container = document.getElementById('results');
+
+    function suite(name, fn) {
+      const div = document.createElement('div');
+      div.className = 'suite';
+      div.innerHTML = `<h2>${name}</h2>`;
+      container.appendChild(div);
+      fn(div);
+    }
+
+    function assert(label, condition, div) {
+      const el = document.createElement('div');
+      el.className = 'result ' + (condition ? 'pass' : 'fail');
+      el.textContent = (condition ? '✓ ' : '✗ ') + label;
+      div.appendChild(el);
+      condition ? passed++ : failed++;
+    }
+
+    function assertPBT(label, result, div) {
+      const ok = result === undefined; // fc.assert throws on failure, returns undefined on pass
+      assert(label, ok, div);
+    }
+
+    // ── Test suites ─────────────────────────────────────────────────────────
+
+    // getWeatherIcon — example-based spot checks
+    suite('getWeatherIcon: example-based', div => {
+      assert('Snow → ❄️',              getWeatherIcon('Snow Showers')   === '❄️',  div);
+      assert('Blizzard → ❄️',          getWeatherIcon('Blizzard')       === '❄️',  div);
+      assert('Rain → 🌧️',              getWeatherIcon('Rain')           === '🌧️', div);
+      assert('Thunderstorm → 🌧️',      getWeatherIcon('Thunderstorm')   === '🌧️', div);
+      assert('Drizzle → 🌧️',           getWeatherIcon('Drizzle')        === '🌧️', div);
+      assert('Partly Cloudy → ⛅',      getWeatherIcon('Partly Cloudy')  === '⛅',  div);
+      assert('Mostly Cloudy → ⛅',      getWeatherIcon('Mostly Cloudy')  === '⛅',  div);
+      assert('Partly Sunny → ⛅',       getWeatherIcon('Partly Sunny')   === '⛅',  div);
+      assert('Cloudy → ☁️',            getWeatherIcon('Cloudy')         === '☁️', div);
+      assert('Overcast → ☁️',          getWeatherIcon('Overcast')       === '☁️', div);
+      assert('Foggy → ☁️',             getWeatherIcon('Foggy')          === '☁️', div);
+      assert('Sunny → ☀️',             getWeatherIcon('Sunny')          === '☀️',  div);
+      assert('Clear → ☀️',             getWeatherIcon('Mostly Clear')   === '☀️',  div);
+      assert('Unknown → 🌡️ (default)', getWeatherIcon('Blustery')       === '🌡️', div);
+      assert('Empty → 🌡️ (default)',   getWeatherIcon('')               === '🌡️', div);
+      assert('null → 🌡️ (default)',    getWeatherIcon(null)             === '🌡️', div);
+    });
+
+    // getWeatherIcon — property-based: known keywords never return default
+    // Property 8: Any shortForecast containing a recognized keyword → not 🌡️
+    suite('getWeatherIcon: property-based (Property 8)', div => {
+      const snowKeywords   = ['snow', 'blizzard', 'flurr'];
+      const rainKeywords   = ['rain', 'shower', 'drizzle', 'storm'];
+      const partlyKeywords = ['partly cloudy', 'mostly cloudy', 'partly sunny'];
+      const cloudKeywords  = ['cloudy', 'overcast', 'fog', 'haz'];
+      const sunKeywords    = ['sunny', 'clear'];
+
+      // Property 8: recognized keywords → correct icon, never default 🌡️
+      try {
+        fc.assert(
+          fc.property(
+            fc.constantFrom(...snowKeywords),
+            keyword => getWeatherIcon(keyword) === '❄️'
+          ),
+          { numRuns: 100 }
+        );
+        assert('Snow keywords always return ❄️', true, div);
+      } catch (e) {
+        assert('Snow keywords always return ❄️ — FAILED: ' + e.message, false, div);
+      }
+
+      try {
+        fc.assert(
+          fc.property(
+            fc.constantFrom(...rainKeywords),
+            keyword => getWeatherIcon(keyword) === '🌧️'
+          ),
+          { numRuns: 100 }
+        );
+        assert('Rain keywords always return 🌧️', true, div);
+      } catch (e) {
+        assert('Rain keywords always return 🌧️ — FAILED: ' + e.message, false, div);
+      }
+
+      try {
+        fc.assert(
+          fc.property(
+            fc.constantFrom(...partlyKeywords),
+            keyword => getWeatherIcon(keyword) === '⛅'
+          ),
+          { numRuns: 100 }
+        );
+        assert('Partly cloudy keywords always return ⛅', true, div);
+      } catch (e) {
+        assert('Partly cloudy keywords always return ⛅ — FAILED: ' + e.message, false, div);
+      }
+
+      try {
+        fc.assert(
+          fc.property(
+            fc.constantFrom(...cloudKeywords),
+            keyword => getWeatherIcon(keyword) === '☁️'
+          ),
+          { numRuns: 100 }
+        );
+        assert('Cloud/overcast keywords always return ☁️', true, div);
+      } catch (e) {
+        assert('Cloud/overcast keywords always return ☁️ — FAILED: ' + e.message, false, div);
+      }
+
+      try {
+        fc.assert(
+          fc.property(
+            fc.constantFrom(...sunKeywords),
+            keyword => getWeatherIcon(keyword) === '☀️'
+          ),
+          { numRuns: 100 }
+        );
+        assert('Sun/clear keywords always return ☀️', true, div);
+      } catch (e) {
+        assert('Sun/clear keywords always return ☀️ — FAILED: ' + e.message, false, div);
+      }
+    });
+
+    // filterDaytimePeriods — example-based
+    suite('filterDaytimePeriods: example-based', div => {
+      function makePeriod(isDaytime) {
+        return { isDaytime, name: 'Day', temperature: 70, windSpeed: '5 mph', windDirection: 'N', shortForecast: 'Sunny' };
+      }
+
+      const mixed = [
+        makePeriod(true),  // day 1
+        makePeriod(false), // night 1
+        makePeriod(true),  // day 2
+        makePeriod(false), // night 2
+        makePeriod(true),  // day 3
+        makePeriod(false), // night 3
+        makePeriod(true),  // day 4
+        makePeriod(false), // night 4
+        makePeriod(true),  // day 5
+        makePeriod(false), // night 5
+        makePeriod(true),  // day 6 — should be excluded
+      ];
+
+      const result = filterDaytimePeriods(mixed);
+      assert('Returns exactly 5 items from mixed day/night array', result.length === 5, div);
+      assert('All returned items are daytime', result.every(p => p.isDaytime === true), div);
+      assert('Returns empty array when no daytime periods', filterDaytimePeriods([makePeriod(false), makePeriod(false)]).length === 0, div);
+      assert('Returns fewer than 5 if fewer daytime periods exist', filterDaytimePeriods([makePeriod(true), makePeriod(true)]).length === 2, div);
+    });
+
+    // filterDaytimePeriods — property-based
+    // Property 6: any array with ≥5 daytime periods → exactly 5 returned, all isDaytime
+    suite('filterDaytimePeriods: property-based (Property 6)', div => {
+      const periodArb = fc.record({
+        isDaytime:     fc.boolean(),
+        name:          fc.constant('Day'),
+        temperature:   fc.integer({ min: -50, max: 120 }),
+        windSpeed:     fc.constant('10 mph'),
+        windDirection: fc.constant('N'),
+        shortForecast: fc.constant('Sunny')
+      });
+
+      // When array has ≥5 daytime periods, result length is exactly 5
+      try {
+        fc.assert(
+          fc.property(
+            fc.array(fc.record({
+              isDaytime:     fc.constant(true),
+              name:          fc.constant('Day'),
+              temperature:   fc.integer({ min: -50, max: 120 }),
+              windSpeed:     fc.constant('10 mph'),
+              windDirection: fc.constant('N'),
+              shortForecast: fc.constant('Sunny')
+            }), { minLength: 5, maxLength: 20 }),
+            daytimePeriods => filterDaytimePeriods(daytimePeriods).length === 5
+          ),
+          { numRuns: 100 }
+        );
+        assert('Any array with ≥5 daytime periods → exactly 5 returned', true, div);
+      } catch (e) {
+        assert('Any array with ≥5 daytime periods → exactly 5 returned — FAILED: ' + e.message, false, div);
+      }
+
+      // All returned items always have isDaytime === true
+      try {
+        fc.assert(
+          fc.property(
+            fc.array(periodArb, { minLength: 0, maxLength: 20 }),
+            periods => filterDaytimePeriods(periods).every(p => p.isDaytime === true)
+          ),
+          { numRuns: 100 }
+        );
+        assert('All returned periods always have isDaytime === true', true, div);
+      } catch (e) {
+        assert('All returned periods always have isDaytime === true — FAILED: ' + e.message, false, div);
+      }
+
+      // Result length never exceeds 5
+      try {
+        fc.assert(
+          fc.property(
+            fc.array(periodArb, { minLength: 0, maxLength: 30 }),
+            periods => filterDaytimePeriods(periods).length <= 5
+          ),
+          { numRuns: 100 }
+        );
+        assert('Result length never exceeds 5', true, div);
+      } catch (e) {
+        assert('Result length never exceeds 5 — FAILED: ' + e.message, false, div);
+      }
+    });
+
+    // ── Summary ─────────────────────────────────────────────────────────────
+    const total = passed + failed;
+    const summaryEl = document.getElementById('summary');
+    summaryEl.className = failed === 0 ? 'pass-summary' : 'fail-summary';
+    summaryEl.textContent = failed === 0
+      ? `✓ All ${total} tests passed`
+      : `✗ ${failed} of ${total} tests failed`;
+  </script>
+</body>
+</html>

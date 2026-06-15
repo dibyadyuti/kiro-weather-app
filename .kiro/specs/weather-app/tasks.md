@@ -38,7 +38,7 @@ Build a single-page weather forecast app (`weather.html`) served by a zero-depen
   - Test empty input — confirm error banner appears
   - Test an invalid city — confirm error banner appears with a helpful message
 
-- [ ] 4. Write basic tests in `weather.test.html`
+- [x] 4. Write basic tests in `weather.test.html`
   - Create `weather.test.html` that loads fast-check from CDN and inlines the testable functions (`getWeatherIcon`, `filterDaytimePeriods`)
   - Test `getWeatherIcon` returns correct icons for a representative sample of keywords and the default fallback for an unrecognized string
   - Test `filterDaytimePeriods` returns exactly 5 items when given an array with mixed day/night periods
