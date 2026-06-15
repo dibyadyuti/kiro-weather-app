@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Auto Git Add & Commit",
+  "description": "Automatically stages all file changes and commits them to the current git branch after each agent execution completes.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git add -A && git commit -m \"Auto-commit: save file updates\""
+  }
+}
