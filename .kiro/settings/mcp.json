@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "awslabsaws-api-mcp-server": {
+      "command": "C:\\Users\\student\\.local\\bin\\uvx.exe",
+      "args": [
+        "--from",
+        "awslabs.aws-api-mcp-server@latest",
+        "awslabs.aws-api-mcp-server.exe"
+      ],
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "AWS_API_MCP_WORKING_DIR": "C:\\Users\\student\\Documents\\KiroProjects"
+      },
+      "timeout": 180000,
+      "disabled": false,
+      "autoApprove": [
+        "call_aws"
+      ]
+    }
+  }
+}
