@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>US Weather Forecast</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #e8f4fd;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      padding: 2rem;
+      width: 100%;
+      max-width: 800px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      color: #1a3a5c;
+      margin-bottom: 1.25rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    #city-input {
+      flex: 1;
+      padding: 0.6rem 0.9rem;
+      border: 1px solid #cdd8e3;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    #city-input:focus {
+      outline: none;
+      border-color: #3a8fd1;
+      box-shadow: 0 0 0 2px rgba(58,143,209,0.2);
+    }
+
+    #search-btn {
+      padding: 0.6rem 1.2rem;
+      background: #3a8fd1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #search-btn:hover:not(:disabled) { background: #2d73b0; }
+    #search-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    #city-input:disabled { background: #f5f5f5; }
+
+    /* Error banner — hidden by default */
+    #error-banner {
+      background: #fff0f0;
+      border: 1px solid #f5a5a5;
+      color: #b00020;
+      border-radius: 6px;
+      padding: 0.65rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+
+    /* Loading indicator — hidden by default */
+    #loading {
+      text-align: center;
+      color: #3a8fd1;
+      padding: 1rem 0;
+      font-size: 0.95rem;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Forecast table */
+    #forecast-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    #forecast-table thead th {
+      background: #1a3a5c;
+      color: #fff;
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+    }
+
+    #forecast-table tbody tr:nth-child(even) { background: #f5faff; }
+
+    #forecast-table tbody td {
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid #dde8f0;
+      vertical-align: middle;
+    }
+
+    .icon-cell { font-size: 1.4rem; text-align: center; }
+    .temp-cell { font-weight: 600; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🌤 US Weather Forecast</h1>
+
+    <div class="input-row">
+      <input
+        type="text"
+        id="city-input"
+        placeholder="Enter a US city (e.g. Austin, TX)"
+        aria-label="City name"
+      />
+      <button id="search-btn">Search</button>
+    </div>
+
+    <div id="error-banner" class="hidden" role="alert"></div>
+    <div id="loading" class="hidden">Loading forecast…</div>
+
+    <table id="forecast-table" class="hidden" aria-live="polite">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Icon</th>
+          <th>Temp</th>
+          <th>Conditions</th>
+          <th>Wind</th>
+        </tr>
+      </thead>
+      <tbody id="forecast-tbody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // ── DOM references ──────────────────────────────────────────────────────
+    const cityInput    = document.getElementById('city-input');
+    const searchBtn    = document.getElementById('search-btn');
+    const errorBanner  = document.getElementById('error-banner');
+    const loadingEl    = document.getElementById('loading');
+    const forecastTable = document.getElementById('forecast-table');
+    const forecastTbody = document.getElementById('forecast-tbody');
+
+    const UA = 'weather-app/1.0 (local-dev)';
+
+    // ── Wire up events ──────────────────────────────────────────────────────
+    searchBtn.addEventListener('click', handleSearch);
+    cityInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSearch();
+    });
+
+    // ── geocode(city) ───────────────────────────────────────────────────────
+    // Uses Nominatim — CORS-safe from the browser.
+    // Returns { lat: number, lon: number }
+    async function geocode(city) {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: { 'Accept': 'application/json' }
+        });
+      } catch (err) {
+        throw new Error('Could not reach the geocoding service. Check your connection.');
+      }
+      if (!response.ok) {
+        throw new Error('Could not reach the geocoding service. Check your connection.');
+      }
+      const results = await response.json();
+      if (!results || results.length === 0) {
+        throw new Error("City not found. Try adding a state abbreviation (e.g., 'Austin, TX').");
+      }
+      return {
+        lat: parseFloat(results[0].lat),
+        lon: parseFloat(results[0].lon)
+      };
+    }
+
+    // ── getNWSPoints(lat, lon) ──────────────────────────────────────────────
+    // Returns the forecast URL string from the NWS /points response.
+    async function getNWSPoints(lat, lon) {
+      const url = `https://api.weather.gov/points/${lat},${lon}`;
+      let response;
+      try {
+        response = await fetch(url, {
+          headers: { 'User-Agent': UA, 'Accept': 'application/geo+json' }
+        });
+      } catch (err) {
+        throw new Error('The NWS weather service is unavailable. Try again shortly.');
+      }
+      if (response.status === 404) {
+        throw new Error('No NWS coverage for this location. NWS only covers the US.');
+      }
+      if (!response.ok) {
+        throw new Error('The NWS weather service is unavailable. Try again shortly.');
+      }
+      const data = await response.json();
+      return data.properties.forecast;
+    }
+
+    // ── getForecast(forecastUrl) ────────────────────────────────────────────
+    // Returns the periods array from the NWS forecast endpoint.
+    async function getForecast(forecastUrl) {
+      let response;
+      try {
+        response = await fetch(forecastUrl, {
+          headers: { 'User-Agent': UA, 'Accept': 'application/geo+json' }
+        });
+      } catch (err) {
+        throw new Error('Could not retrieve forecast data. Try again shortly.');
+      }
+      if (!response.ok) {
+        throw new Error('Could not retrieve forecast data. Try again shortly.');
+      }
+      const data = await response.json();
+      return data.properties.periods;
+    }
+
+    // ── filterDaytimePeriods(periods) ───────────────────────────────────────
+    // Keeps only isDaytime === true periods and returns the first 5.
+    function filterDaytimePeriods(periods) {
+      return periods.filter(p => p.isDaytime === true).slice(0, 5);
+    }
+
+    // ── getWeatherIcon(shortForecast) ───────────────────────────────────────
+    // Maps NWS forecast description to an emoji icon via keyword matching.
+    function getWeatherIcon(shortForecast) {
+      const s = (shortForecast || '').toLowerCase();
+      if (/snow|blizzard|flurr/.test(s))                          return '❄️';
+      if (/rain|shower|drizzle|storm/.test(s))                    return '🌧️';
+      if (/partly cloudy|mostly cloudy|partly sunny/.test(s))     return '⛅';
+      if (/cloudy|overcast|fog|haz/.test(s))                      return '☁️';
+      if (/sunny|clear/.test(s))                                   return '☀️';
+      return '🌡️';
+    }
+
+    // ── renderTable(periods) ────────────────────────────────────────────────
+    // Clears #forecast-tbody and builds one <tr> per daytime period.
+    function renderTable(periods) {
+      forecastTbody.innerHTML = '';
+      const daytime = filterDaytimePeriods(periods);
+
+      daytime.forEach(period => {
+        const icon = getWeatherIcon(period.shortForecast);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escHtml(period.name)}</td>
+          <td class="icon-cell" aria-label="${escHtml(period.shortForecast)}">${icon}</td>
+          <td class="temp-cell">${period.temperature}°F</td>
+          <td>${escHtml(period.shortForecast)}</td>
+          <td>${escHtml(period.windSpeed)} ${escHtml(period.windDirection)}</td>
+        `;
+        forecastTbody.appendChild(tr);
+      });
+
+      forecastTable.classList.remove('hidden');
+    }
+
+    // ── setLoading(isLoading) ───────────────────────────────────────────────
+    function setLoading(isLoading) {
+      cityInput.disabled  = isLoading;
+      searchBtn.disabled  = isLoading;
+      loadingEl.classList.toggle('hidden', !isLoading);
+    }
+
+    // ── showError / hideError ───────────────────────────────────────────────
+    function showError(message) {
+      errorBanner.textContent = message;
+      errorBanner.classList.remove('hidden');
+    }
+
+    function hideError() {
+      errorBanner.classList.add('hidden');
+      errorBanner.textContent = '';
+    }
+
+    // ── handleSearch() ──────────────────────────────────────────────────────
+    async function handleSearch() {
+      hideError();
+      const city = cityInput.value.trim();
+      if (!city) {
+        showError('Please enter a city name.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const { lat, lon } = await geocode(city);
+        const forecastUrl  = await getNWSPoints(lat, lon);
+        const periods      = await getForecast(forecastUrl);
+        renderTable(periods);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // ── Utility ─────────────────────────────────────────────────────────────
+    function escHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

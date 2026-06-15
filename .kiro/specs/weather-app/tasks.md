@@ -14,7 +14,7 @@ Build a single-page weather forecast app (`weather.html`) served by a zero-depen
   - Also create `start.bat` as a fallback launcher that runs `powershell -ExecutionPolicy Bypass -File server.ps1`
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 2. Build `weather.html` — full app in a single file
+- [x] 2. Build `weather.html` — full app in a single file
   - Create `weather.html` with `<!DOCTYPE html>`, `<head>` (charset, viewport, title), and `<body>`
   - Embed a `<style>` block with basic layout: card container, input row, error banner (hidden by default via `.hidden` class), loading indicator (hidden by default), and forecast table styles
   - Add DOM elements: `#city-input` text field, `#search-btn` button, `#error-banner` div, `#loading` div, `#forecast-table` with `#forecast-tbody`
