@@ -6,7 +6,7 @@ Build a single-page weather forecast app (`weather.html`) served by a zero-depen
 
 ## Tasks
 
-- [ ] 1. Create `server.ps1` — PowerShell HttpListener file server
+- [x] 1. Create `server.ps1` — PowerShell HttpListener file server
   - Implement `System.Net.HttpListener` listening on `http://localhost:8080/`
   - On each `GET /` request, read `weather.html` from the same directory and respond with its content and `Content-Type: text/html; charset=utf-8`
   - Print `"Weather app running at http://localhost:8080 — press Ctrl+C to stop."` on startup
